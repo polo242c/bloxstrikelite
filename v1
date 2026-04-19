@@ -1,0 +1,726 @@
+-- ==========================================================
+-- POLO LITE BLOXSTRIKE
+-- PREMIUM MULTI-HACK | FULL RECODE, 100% SAFE, REAL RCS
+-- ==========================================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+pcall(function() setclipboard = (rawget and rawget(_G,"setclipboard")) or (rawget and rawget(_G,"toclipboard")) or _G.setclipboard or _G.toclipboard end)
+
+local mousemoverel = mousemoverel or (Input and Input.MouseMoveRel) or mouse_moverel or function() end
+
+local function rndStr()
+    local s = ""
+    for i = 1, 12 do s = s .. string.char(math.random(97, 122)) end
+    return s
+end
+
+local GuiName1 = rndStr()
+local GuiName2 = rndStr()
+local ChamName = rndStr()
+
+local function GetUIFolder()
+    local success, result = pcall(function() return gethui() end)
+    if success and result then return result end
+    success, result = pcall(function() return CoreGui end)
+    if success and result then return result end
+    return LocalPlayer:WaitForChild("PlayerGui", 10)
+end
+local UIFolder = GetUIFolder()
+
+local Config = {
+    MenuKey = Enum.KeyCode.P,
+    
+    Aimlock = false, AimMethod = "Raw Mouse", AimSmoothness = 2, AimJitter = 10, AimFOV = 150, AimPrediction = true, AimWallCheck = true,
+    SilentEnabled = false, FOV = 150, ShowFOV = true, 
+    TargetPartMode = "Head",
+    RCS = false, RCS_Strength = 5,
+    HitSound = false, CustomHitSoundID = "131051026960528", Hitmarker = true,
+    
+    HitboxExpander = false, HitboxSize = 2, HitboxTransparency = 50,
+    
+    ESP = false, Tracers = false, ShowTeammates = false, TeamColors = true, NightMode = false,
+    Box = false, Name = false, HPBar = false, Skeleton = false, SmartPartESP = false,
+    
+    SpinCrosshair = false, CrosshairSpeed = 10,
+    AutoBhop = false,
+    
+    AutoApplySkins = true, ActiveGunSkins = {}, TargetKnife = "Karambit", TargetSkin = "Vanilla", TargetGlove = "Sports Gloves", TargetSkinGlove = "Vanilla"
+}
+
+local W = { PlayerCache = {}, OriginalSizes = {}, ESP_Objects = {} }
+
+local function AddToCache(model)
+    if not model:IsA("Model") or model.Name == LocalPlayer.Name then return end
+    local root = model:WaitForChild("HumanoidRootPart", 2)
+    local head = model:WaitForChild("Head", 2)
+    local hum = model:WaitForChild("Humanoid", 2)
+    if root and head and hum then W.PlayerCache[model] = {Root = root, Head = head, Humanoid = hum} end
+end
+
+local CharFolder
+task.spawn(function()
+    CharFolder = Workspace:WaitForChild("Characters", 15)
+    if CharFolder then
+        for _, folder in pairs(CharFolder:GetChildren()) do
+            for _, model in pairs(folder:GetChildren()) do task.spawn(function() AddToCache(model) end) end
+        end
+        CharFolder.DescendantAdded:Connect(function(desc) if desc:IsA("Model") and desc:FindFirstChild("Humanoid") then task.spawn(function() AddToCache(desc) end) end end)
+        CharFolder.DescendantRemoving:Connect(function(desc) if W.PlayerCache[desc] then W.PlayerCache[desc] = nil end end)
+    end
+end)
+
+local UIUpdaters = {}
+local Theme = { 
+    Background = Color3.fromRGB(15, 15, 15), 
+    Panel = Color3.fromRGB(25, 25, 25), 
+    MainColor = Color3.fromRGB(138, 43, 226),
+    AccentColor = Color3.fromRGB(75, 0, 130),
+    Text = Color3.fromRGB(255, 255, 255),
+    TextDim = Color3.fromRGB(150, 150, 150) 
+}
+
+local MasterGui = Instance.new("ScreenGui", UIFolder); MasterGui.Name = GuiName1; MasterGui.IgnoreGuiInset = true; MasterGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local HitmarkerCenter = Instance.new("Frame", MasterGui); HitmarkerCenter.BackgroundTransparency = 1; HitmarkerCenter.Size = UDim2.new(0, 16, 0, 16); HitmarkerCenter.Position = UDim2.new(0.5, -8, 0.5, -8); HitmarkerCenter.Visible = false; HitmarkerCenter.ZIndex = 9999
+for i=1, 4 do local l = Instance.new("Frame", HitmarkerCenter); l.Size = UDim2.new(0,2,0,8); l.BackgroundColor3 = Color3.new(1,1,1); l.BorderSizePixel = 0; if i==1 then l.Position=UDim2.new(0,2,0,2); l.Rotation=45 elseif i==2 then l.Position=UDim2.new(1,-4,0,2); l.Rotation=-45 elseif i==3 then l.Position=UDim2.new(0,2,1,-10); l.Rotation=-45 else l.Position=UDim2.new(1,-4,1,-10); l.Rotation=45 end end
+
+local SilentFOV = Instance.new("Frame", MasterGui); SilentFOV.BackgroundTransparency = 1; SilentFOV.Visible = false; SilentFOV.AnchorPoint = Vector2.new(0.5, 0.5); SilentFOV.ZIndex = 9999
+local sfStroke = Instance.new("UIStroke", SilentFOV); sfStroke.Color = Theme.MainColor; sfStroke.Thickness = 1.5; Instance.new("UICorner", SilentFOV).CornerRadius = UDim.new(1,0)
+
+local CrossFrame = Instance.new("Frame", MasterGui); CrossFrame.Size = UDim2.new(0, 24, 0, 24); CrossFrame.AnchorPoint = Vector2.new(0.5, 0.5); CrossFrame.Position = UDim2.new(0.5, 0, 0.5, 0); CrossFrame.BackgroundTransparency = 1; CrossFrame.Visible = false; CrossFrame.ZIndex = 99999
+local l1 = Instance.new("Frame", CrossFrame); l1.Size = UDim2.new(0, 2, 1, 0); l1.Position = UDim2.new(0.5, -1, 0, 0); l1.BackgroundColor3 = Color3.new(1,1,1); l1.BorderSizePixel = 0
+local l2 = Instance.new("Frame", CrossFrame); l2.Size = UDim2.new(1, 0, 0, 2); l2.Position = UDim2.new(0, 0, 0.5, -1); l2.BackgroundColor3 = Color3.new(1,1,1); l2.BorderSizePixel = 0
+
+local MenuGui = Instance.new("ScreenGui", UIFolder); MenuGui.Name = GuiName2; MenuGui.ResetOnSpawn = false; MenuGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+local targetWidth, targetHeight = 550, 400
+
+local MainFrame = Instance.new("Frame", MenuGui); MainFrame.AnchorPoint = Vector2.new(0.5, 0.5); MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0); MainFrame.Size = UDim2.new(0, 0, 0, 0); MainFrame.BackgroundColor3 = Theme.Background; MainFrame.ClipsDescendants = true; MainFrame.Visible = false; Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", MainFrame).Color = Theme.MainColor
+local SkinFrame = Instance.new("Frame", MenuGui); SkinFrame.AnchorPoint = Vector2.new(0.5, 0.5); SkinFrame.Position = UDim2.new(0.5, 0, 0.5, 0); SkinFrame.Size = UDim2.new(0, 750, 0, 450); SkinFrame.BackgroundColor3 = Theme.Background; SkinFrame.Visible = false; Instance.new("UICorner", SkinFrame).CornerRadius = UDim.new(0, 8); Instance.new("UIStroke", SkinFrame).Color = Theme.AccentColor
+
+local function MakeDraggable(frame)
+    local drag, dInp, dStart, sPos
+    frame.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = true; dStart = i.Position; sPos = frame.Position end end)
+    frame.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end end)
+    UserInputService.InputChanged:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseMovement then dInp = i end; if drag and dInp then local d = dInp.Position - dStart; frame.Position = UDim2.new(sPos.X.Scale, sPos.X.Offset + d.X, sPos.Y.Scale, sPos.Y.Offset + d.Y) end end)
+end
+MakeDraggable(MainFrame); MakeDraggable(SkinFrame)
+
+local IsMenuOpen, isTweening = false, false
+local function ToggleMenu(state)
+    if isTweening then return end; IsMenuOpen = state; isTweening = true
+    if state then
+        MainFrame.Visible = true; local t = TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size=UDim2.new(0,targetWidth,0,targetHeight)}); t:Play(); t.Completed:Connect(function() isTweening=false end)
+    else
+        local t = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size=UDim2.new(0,0,0,0)}); t:Play(); t.Completed:Connect(function() MainFrame.Visible=false; isTweening=false end)
+    end
+end
+
+local Top = Instance.new("Frame", MainFrame); Top.Size = UDim2.new(1,0,0,40); Top.BackgroundTransparency=1
+local Tit = Instance.new("TextLabel", Top); Tit.Size=UDim2.new(0,200,1,0); Tit.Position=UDim2.new(0,15,0,0); Tit.BackgroundTransparency=1; Tit.Text="Polo Lite"; Tit.TextColor3=Theme.Text; Tit.Font=Enum.Font.GothamBlack; Tit.TextSize=16; Tit.TextXAlignment=Enum.TextXAlignment.Left
+Instance.new("Frame", MainFrame).Size = UDim2.new(1,0,0,1); Instance.new("Frame", MainFrame).Position = UDim2.new(0,0,0,40); Instance.new("Frame", MainFrame).BackgroundColor3 = Theme.Panel; Instance.new("Frame", MainFrame).BorderSizePixel = 0
+
+local TabBar = Instance.new("Frame", MainFrame); TabBar.Size = UDim2.new(1,0,0,30); TabBar.Position = UDim2.new(0,0,0,41); TabBar.BackgroundTransparency=1
+local TabCont = Instance.new("Frame", MainFrame); TabCont.Size = UDim2.new(1,-20,1,-85); TabCont.Position = UDim2.new(0,10,0,75); TabCont.BackgroundTransparency=1
+local Ind = Instance.new("Frame", TabBar); Ind.Size = UDim2.new(1/3,0,0,2); Ind.Position = UDim2.new(0,0,1,-2); Ind.BackgroundColor3 = Theme.MainColor; Ind.BorderSizePixel=0
+
+local function CreateTab(name, idx)
+    local B = Instance.new("TextButton", TabBar); B.Size = UDim2.new(1/3,0,1,-2); B.Position = UDim2.new((idx-1)/3,0,0,0); B.BackgroundTransparency=1; B.Text=name; B.TextColor3=idx==1 and Theme.MainColor or Theme.TextDim; B.Font=Enum.Font.GothamBold; B.TextSize=12
+    local P = Instance.new("ScrollingFrame", TabCont); P.Size=UDim2.new(1,0,1,0); P.BackgroundTransparency=1; P.BorderSizePixel=0; P.ScrollBarThickness=2; P.ScrollBarImageColor3=Theme.MainColor; P.Visible=(idx==1); P.AutomaticCanvasSize=Enum.AutomaticSize.Y
+    local L = Instance.new("UIListLayout", P); L.SortOrder=Enum.SortOrder.LayoutOrder; L.Padding=UDim.new(0,6)
+    B.MouseButton1Click:Connect(function()
+        for _,c in pairs(TabCont:GetChildren()) do if c:IsA("ScrollingFrame") then c.Visible=false end end
+        for _,c in pairs(TabBar:GetChildren()) do if c:IsA("TextButton") then c.TextColor3=Theme.TextDim end end
+        P.Visible=true; B.TextColor3=Theme.MainColor; TweenService:Create(Ind, TweenInfo.new(0.2), {Position=UDim2.new((idx-1)/3,0,1,-2)}):Play()
+    end)
+    return P
+end
+
+local PageCombat = CreateTab("COMBAT", 1); local PageVisuals = CreateTab("VISUALS", 2); local PageConfig = CreateTab("CONFIG", 3)
+
+local function CreateToggle(parent, text, varName)
+    local ToggleBtn = Instance.new("TextButton", parent); ToggleBtn.Size = UDim2.new(1, 0, 0, 32); ToggleBtn.BackgroundColor3 = Theme.Panel; ToggleBtn.BorderSizePixel = 0; ToggleBtn.Text = ""; Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 4)
+    local Box = Instance.new("Frame", ToggleBtn); Box.Size = UDim2.new(0, 18, 0, 18); Box.Position = UDim2.new(0, 10, 0.5, -9); Box.BackgroundColor3 = Config[varName] and Theme.MainColor or Theme.Background; Instance.new("UICorner", Box).CornerRadius = UDim.new(0, 4)
+    local Label = Instance.new("TextLabel", ToggleBtn); Label.Text = text; Label.Size = UDim2.new(1, -40, 1, 0); Label.Position = UDim2.new(0, 38, 0, 0); Label.BackgroundTransparency = 1; Label.TextColor3 = Config[varName] and Theme.Text or Theme.TextDim; Label.Font = Enum.Font.GothamMedium; Label.TextSize = 13; Label.TextXAlignment = Enum.TextXAlignment.Left
+    UIUpdaters[varName] = function(val) Config[varName] = val; TweenService:Create(Box, TweenInfo.new(0.15), {BackgroundColor3 = val and Theme.MainColor or Theme.Background}):Play(); Label.TextColor3 = val and Theme.Text or Theme.TextDim end
+    ToggleBtn.MouseButton1Click:Connect(function() UIUpdaters[varName](not Config[varName]) end)
+end
+
+local function CreateSlider(parent, text, min, max, varName)
+    local Frame = Instance.new("Frame", parent); Frame.Size = UDim2.new(1, 0, 0, 40); Frame.BackgroundColor3 = Theme.Panel; Frame.BorderSizePixel = 0; Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 4)
+    local Label = Instance.new("TextLabel", Frame); Label.Text = text; Label.Size = UDim2.new(1, -20, 0, 20); Label.Position = UDim2.new(0, 10, 0, 4); Label.BackgroundTransparency = 1; Label.TextColor3 = Theme.Text; Label.Font = Enum.Font.GothamMedium; Label.TextSize = 12; Label.TextXAlignment = Enum.TextXAlignment.Left
+    local ValueLabel = Instance.new("TextLabel", Frame); ValueLabel.Text = tostring(Config[varName]); ValueLabel.Size = UDim2.new(0, 40, 0, 20); ValueLabel.Position = UDim2.new(1, -50, 0, 4); ValueLabel.BackgroundTransparency = 1; ValueLabel.TextColor3 = Theme.MainColor; ValueLabel.Font = Enum.Font.GothamBold; ValueLabel.TextSize = 12; ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    local BarBg = Instance.new("Frame", Frame); BarBg.Size = UDim2.new(1, -20, 0, 4); BarBg.Position = UDim2.new(0, 10, 0, 28); BarBg.BackgroundColor3 = Theme.Background; BarBg.BorderSizePixel = 0; Instance.new("UICorner", BarBg).CornerRadius = UDim.new(1, 0)
+    local initialPos = math.clamp(((tonumber(Config[varName]) or min) - min) / (max - min), 0, 1)
+    local BarFill = Instance.new("Frame", BarBg); BarFill.Size = UDim2.new(initialPos, 0, 1, 0); BarFill.BackgroundColor3 = Theme.MainColor; BarFill.BorderSizePixel = 0; Instance.new("UICorner", BarFill).CornerRadius = UDim.new(1, 0)
+    local Trigger = Instance.new("TextButton", BarBg); Trigger.Size = UDim2.new(1, 0, 1, 10); Trigger.Position = UDim2.new(0, 0, 0.5, -5); Trigger.BackgroundTransparency = 1; Trigger.Text = ""
+    UIUpdaters[varName] = function(val) Config[varName] = val; local pos = math.clamp((tonumber(val) - min) / (max - min), 0, 1); BarFill.Size = UDim2.new(pos, 0, 1, 0); ValueLabel.Text = tostring(val) end
+    local drag = false
+    local function Update(i) local pos = math.clamp((i.Position.X - BarBg.AbsolutePosition.X) / BarBg.AbsoluteSize.X, 0, 1); BarFill.Size = UDim2.new(pos, 0, 1, 0); local val = math.floor(((max - min) * pos + min)); Config[varName] = val; ValueLabel.Text = tostring(val) end
+    Trigger.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = true; Update(i) end end)
+    UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end end)
+    UserInputService.InputChanged:Connect(function(i) if drag and i.UserInputType == Enum.UserInputType.MouseMovement then Update(i) end end)
+end
+
+local function CreateDropdown(parent, text, options, varName)
+    local Wrap = Instance.new("Frame", parent); Wrap.Size = UDim2.new(1, 0, 0, 32); Wrap.BackgroundTransparency = 1; Wrap.ClipsDescendants = false
+    local Btn = Instance.new("TextButton", Wrap); Btn.Size = UDim2.new(1, 0, 0, 32); Btn.BackgroundColor3 = Theme.Panel; Btn.Text = ""; Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+    local Lbl = Instance.new("TextLabel", Btn); Lbl.Size = UDim2.new(1, -30, 1, 0); Lbl.Position = UDim2.new(0, 10, 0, 0); Lbl.BackgroundTransparency = 1; Lbl.Text = text .. ": " .. tostring(Config[varName]); Lbl.TextColor3 = Theme.Text; Lbl.Font = Enum.Font.GothamMedium; Lbl.TextSize = 12; Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    local Drop = Instance.new("Frame", MenuGui); Drop.BackgroundColor3 = Theme.Panel; Drop.Visible = false; Drop.ZIndex = 50; Drop.ClipsDescendants = true; Instance.new("UICorner", Drop).CornerRadius = UDim.new(0, 4)
+    local DL = Instance.new("UIListLayout", Drop); DL.SortOrder = Enum.SortOrder.LayoutOrder
+
+    UIUpdaters[varName] = function(val) Config[varName] = val; Lbl.Text = text .. ": " .. tostring(val) end
+    for i, opt in ipairs(options) do
+        local ob = Instance.new("TextButton", Drop); ob.Size = UDim2.new(1, 0, 0, 25); ob.BackgroundColor3 = Theme.Panel; ob.BorderSizePixel = 0; ob.Text = opt; ob.TextColor3 = Config[varName] == opt and Theme.MainColor or Theme.TextDim; ob.Font = Enum.Font.GothamMedium; ob.TextSize = 11; ob.ZIndex = 51
+        ob.MouseButton1Click:Connect(function() UIUpdaters[varName](opt); for _, c in pairs(Drop:GetChildren()) do if c:IsA("TextButton") then c.TextColor3 = Theme.TextDim end end; ob.TextColor3 = Theme.MainColor; Drop.Visible = false end)
+    end
+    Btn.MouseButton1Click:Connect(function()
+        if Drop.Visible then Drop.Visible = false else
+            Drop.Size = UDim2.fromOffset(Btn.AbsoluteSize.X, #options * 25); Drop.Position = UDim2.fromOffset(Btn.AbsolutePosition.X, Btn.AbsolutePosition.Y + 34); Drop.Visible = true
+        end
+    end)
+    RunService.RenderStepped:Connect(function() if Drop.Visible then Drop.Position = UDim2.fromOffset(Btn.AbsolutePosition.X, Btn.AbsolutePosition.Y + 34) end end)
+end
+
+local function CreateDivider(parent, text)
+    local Lbl = Instance.new("TextLabel", parent); Lbl.Size = UDim2.new(1, 0, 0, 20); Lbl.BackgroundTransparency = 1; Lbl.Text = "- " .. text .. " -"; Lbl.TextColor3 = Theme.MainColor; Lbl.Font = Enum.Font.GothamBold; Lbl.TextSize = 12
+end
+
+CreateToggle(PageCombat, "Enable Aimlock (Hold M2)", "Aimlock")
+CreateDropdown(PageCombat, "Aimlock Method", {"Smooth Mouse", "Raw Mouse"}, "AimMethod")
+CreateSlider(PageCombat, "Aimlock FOV", 10, 1000, "AimFOV")
+CreateSlider(PageCombat, "Aim Smoothness", 1, 20, "AimSmoothness")
+CreateToggle(PageCombat, "Aim Wall Check", "AimWallCheck")
+
+CreateToggle(PageCombat, "Silent Aim (Bullet TP)", "SilentEnabled")
+CreateToggle(PageCombat, "Show Hitmarker", "Hitmarker")
+CreateToggle(PageCombat, "Show FOV Circle", "ShowFOV")
+CreateSlider(PageCombat, "FOV Size", 50, 1000, "FOV")
+
+CreateToggle(PageCombat, "Mouse RCS (When Shooting)", "RCS")
+CreateSlider(PageCombat, "RCS Strength (Pull Down)", 1, 50, "RCS_Strength")
+
+CreateToggle(PageCombat, "Enable Hitbox Expander", "HitboxExpander")
+CreateSlider(PageCombat, "Hitbox Size (Max 3)", 1, 3, "HitboxSize")
+
+CreateToggle(PageVisuals, "Enable Master ESP", "ESP")
+CreateToggle(PageVisuals, "Boxes", "Box")
+CreateToggle(PageVisuals, "Skeleton ESP", "Skeleton")
+CreateToggle(PageVisuals, "Name ESP", "Name")
+CreateToggle(PageVisuals, "Smart Visible Chams", "SmartPartESP")
+CreateToggle(PageVisuals, "HP Bar ESP", "HPBar")
+CreateToggle(PageVisuals, "Tracers", "Tracers")
+
+CreateDivider(PageVisuals, "VISUALS")
+CreateToggle(PageVisuals, "Spin RGB Crosshair", "SpinCrosshair")
+CreateSlider(PageVisuals, "Crosshair Speed", 1, 50, "CrosshairSpeed")
+
+CreateToggle(PageConfig, "Auto Bhop (Hold Space)", "AutoBhop")
+
+CreateDivider(PageConfig, "CONFIG MANAGER")
+local btnSave = Instance.new("TextButton", PageConfig); btnSave.Size = UDim2.new(1, 0, 0, 32); btnSave.BackgroundColor3 = Theme.Panel; btnSave.Text = "SAVE CONFIG"; btnSave.TextColor3 = Theme.MainColor; btnSave.Font = Enum.Font.GothamBold; btnSave.TextSize = 13; Instance.new("UICorner", btnSave).CornerRadius = UDim.new(0, 4)
+btnSave.MouseButton1Click:Connect(function() 
+    if writefile then 
+        pcall(function() writefile("PoloLite_Config.json", HttpService:JSONEncode(Config)) end)
+        btnSave.Text = "SAVED!"
+        task.delay(1, function() btnSave.Text = "SAVE CONFIG" end)
+    else
+        btnSave.Text = "NOT SUPPORTED"
+        task.delay(1, function() btnSave.Text = "SAVE CONFIG" end)
+    end 
+end)
+
+local btnLoad = Instance.new("TextButton", PageConfig); btnLoad.Size = UDim2.new(1, 0, 0, 32); btnLoad.BackgroundColor3 = Theme.Panel; btnLoad.Text = "LOAD CONFIG"; btnLoad.TextColor3 = Theme.MainColor; btnLoad.Font = Enum.Font.GothamBold; btnLoad.TextSize = 13; Instance.new("UICorner", btnLoad).CornerRadius = UDim.new(0, 4)
+btnLoad.MouseButton1Click:Connect(function() 
+    if readfile and isfile and isfile("PoloLite_Config.json") then 
+        local s, data = pcall(function() return HttpService:JSONDecode(readfile("PoloLite_Config.json")) end)
+        if s and data then
+            for k, v in pairs(data) do 
+                if Config[k] ~= nil then Config[k] = v; if UIUpdaters[k] then pcall(function() UIUpdaters[k](v) end) end end 
+            end
+            btnLoad.Text = "LOADED!"
+        else
+            btnLoad.Text = "ERROR"
+        end
+        task.delay(1, function() btnLoad.Text = "LOAD CONFIG" end)
+    else
+        btnLoad.Text = "NO CONFIG FOUND"
+        task.delay(1, function() btnLoad.Text = "LOAD CONFIG" end)
+    end 
+end)
+
+local STop = Instance.new("Frame", SkinFrame); STop.Size = UDim2.new(1,0,0,40); STop.BackgroundTransparency=1
+local STit = Instance.new("TextLabel", STop); STit.Size=UDim2.new(0,300,1,0); STit.Position=UDim2.new(0,15,0,0); STit.BackgroundTransparency=1; STit.Text="Polo Skin Changer (F5)"; STit.TextColor3=Theme.MainColor; STit.Font=Enum.Font.GothamBlack; STit.TextSize=16; STit.TextXAlignment=Enum.TextXAlignment.Left
+local BackBtn = Instance.new("TextButton", STop); BackBtn.Size=UDim2.new(0,60,0,24); BackBtn.Position=UDim2.new(1, -70, 0, 8); BackBtn.BackgroundColor3=Theme.AccentColor; BackBtn.Text="CLOSE"; BackBtn.TextColor3=Theme.Text; BackBtn.Font=Enum.Font.GothamBold; BackBtn.TextSize=11; Instance.new("UICorner", BackBtn).CornerRadius=UDim.new(0,4)
+BackBtn.MouseButton1Click:Connect(function() SkinFrame.Visible = false end)
+
+local STabBar = Instance.new("Frame", SkinFrame); STabBar.Size=UDim2.new(1,-20,0,30); STabBar.Position=UDim2.new(0,10,0,40); STabBar.BackgroundTransparency=1
+local SCont = Instance.new("Frame", SkinFrame); SCont.Size=UDim2.new(1,-20,1,-80); SCont.Position=UDim2.new(0,10,0,75); SCont.BackgroundTransparency=1
+local SInd = Instance.new("Frame", STabBar); SInd.Size=UDim2.new(1/3,0,0,2); SInd.Position=UDim2.new(0,0,1,-2); SInd.BackgroundColor3=Theme.MainColor; SInd.BorderSizePixel=0
+
+local function CreateSkinTab(name, idx)
+    local B = Instance.new("TextButton", STabBar); B.Size = UDim2.new(1/3,0,1,-2); B.Position = UDim2.new((idx-1)/3,0,0,0); B.BackgroundTransparency=1; B.Text=name; B.TextColor3=idx==1 and Theme.MainColor or Theme.TextDim; B.Font=Enum.Font.GothamBold; B.TextSize=12
+    local P = Instance.new("Frame", SCont); P.Size=UDim2.new(1,0,1,0); P.BackgroundTransparency=1; P.Visible=(idx==1);
+    B.MouseButton1Click:Connect(function()
+        for _,c in pairs(SCont:GetChildren()) do if c:IsA("Frame") then c.Visible=false end end
+        for _,c in pairs(STabBar:GetChildren()) do if c:IsA("TextButton") then c.TextColor3=Theme.TextDim end end
+        P.Visible=true; B.TextColor3=Theme.MainColor; TweenService:Create(SInd, TweenInfo.new(0.2), {Position=UDim2.new((idx-1)/3,0,1,-2)}):Play()
+    end)
+    return P
+end
+
+local PageGuns = CreateSkinTab("GUNS", 1); local PageKnives = CreateSkinTab("KNIVES", 2); local PageGloves = CreateSkinTab("GLOVES", 3)
+
+local function SetupSkinUI(Page)
+    local SearchWep = Instance.new("TextBox", Page); SearchWep.Size = UDim2.new(0.48, 0, 0, 30); SearchWep.Position = UDim2.new(0, 0, 0, 0); SearchWep.BackgroundColor3 = Theme.Panel; SearchWep.Text = ""; SearchWep.PlaceholderText = "Search Weapon..."; SearchWep.TextColor3 = Theme.MainColor; SearchWep.Font = Enum.Font.GothamMedium; SearchWep.TextSize = 12; Instance.new("UICorner", SearchWep).CornerRadius = UDim.new(0,4)
+    local SearchSkin = Instance.new("TextBox", Page); SearchSkin.Size = UDim2.new(0.48, 0, 0, 30); SearchSkin.Position = UDim2.new(0.52, 0, 0, 0); SearchSkin.BackgroundColor3 = Theme.Panel; SearchSkin.Text = ""; SearchSkin.PlaceholderText = "Search Skin..."; SearchSkin.TextColor3 = Theme.MainColor; SearchSkin.Font = Enum.Font.GothamMedium; SearchSkin.TextSize = 12; Instance.new("UICorner", SearchSkin).CornerRadius = UDim.new(0,4)
+    
+    local ScrollWep = Instance.new("ScrollingFrame", Page); ScrollWep.Size = UDim2.new(0.48, 0, 1, -45); ScrollWep.Position = UDim2.new(0, 0, 0, 35); ScrollWep.BackgroundColor3 = Theme.Panel; ScrollWep.BorderSizePixel = 0; ScrollWep.ScrollBarThickness = 2; ScrollWep.ScrollBarImageColor3 = Theme.MainColor
+    local LayoutWep = Instance.new("UIListLayout", ScrollWep); LayoutWep.Padding = UDim.new(0, 4)
+    
+    local ScrollSkin = Instance.new("ScrollingFrame", Page); ScrollSkin.Size = UDim2.new(0.48, 0, 1, -45); ScrollSkin.Position = UDim2.new(0.52, 0, 0, 35); ScrollSkin.BackgroundColor3 = Theme.Panel; ScrollSkin.BorderSizePixel = 0; ScrollSkin.ScrollBarThickness = 2; ScrollSkin.ScrollBarImageColor3 = Theme.MainColor
+    local LayoutSkin = Instance.new("UIListLayout", ScrollSkin); LayoutSkin.Padding = UDim.new(0, 4)
+    
+    SearchWep:GetPropertyChangedSignal("Text"):Connect(function() local t = string.lower(SearchWep.Text); for _, b in pairs(ScrollWep:GetChildren()) do if b:IsA("TextButton") then b.Visible = (t == "" or string.find(string.lower(b.Text), t)) ~= nil end end end)
+    SearchSkin:GetPropertyChangedSignal("Text"):Connect(function() local t = string.lower(SearchSkin.Text); for _, b in pairs(ScrollSkin:GetChildren()) do if b:IsA("TextButton") then b.Visible = (t == "" or string.find(string.lower(b.Text), t)) ~= nil end end end)
+    
+    return ScrollWep, ScrollSkin, LayoutWep, LayoutSkin
+end
+
+local GunWepScroll, GunSkinScroll, GL, GSL = SetupSkinUI(PageGuns)
+local KniWepScroll, KniSkinScroll, KL, KSL = SetupSkinUI(PageKnives)
+local GloWepScroll, GloSkinScroll, GLL, GSSL = SetupSkinUI(PageGloves)
+
+local AvailableGunSkins = {}; local FoundKnives = {}; local FoundSkins = {"Vanilla"}; local FoundGloves = {}; local FoundGloveSkins = {}
+local skinsFolder = ReplicatedStorage:FindFirstChild("Assets") and ReplicatedStorage.Assets:FindFirstChild("Skins")
+if skinsFolder then
+    for _, folder in pairs(skinsFolder:GetChildren()) do
+        local n = string.lower(folder.Name); local isK = false
+        for _, kw in ipairs({"knife","karambit","bayonet","butterfly","gut","huntsman","falchion","bowie","daggers","navaja","stiletto","talon","ursus","kukri","dagger","sickle","machete"}) do if string.find(n, kw) then isK = true; table.insert(FoundKnives, folder.Name); break end end
+        if not isK and (string.find(n, "glove") or string.find(n, "wraps")) then isK = true; table.insert(FoundGloves, folder.Name) end
+        if not isK then AvailableGunSkins[folder.Name] = {}; for _, s in pairs(folder:GetChildren()) do table.insert(AvailableGunSkins[folder.Name], s.Name) end end
+    end
+end
+
+local function ApplyWeaponSkin(weaponModel)
+    pcall(function()
+        local weaponName = weaponModel.Name
+        local isGlove = false; local isKnife = false
+        local targetWeaponName = weaponName; local targetSkinName = "Vanilla"
+        
+        local nLower = string.lower(weaponName)
+        if string.find(nLower, "glove") or string.find(nLower, "wraps") or string.find(nLower, "hand") or string.find(nLower, "arm") then
+            isGlove = true; targetWeaponName = Config.TargetGlove or "Sports Gloves"; targetSkinName = Config.TargetSkinGlove or "Vanilla"
+        end
+        for _, knife in ipairs({"CT Knife", "T Knife", "Knife", "BaseKnife", "Melee"}) do
+            if nLower == string.lower(knife) or nLower == string.lower(Config.TargetKnife) then
+                isKnife = true; targetWeaponName = Config.TargetKnife or "Karambit"; targetSkinName = Config.TargetSkin or "Vanilla"
+                break
+            end
+        end
+        
+        if not isGlove and not isKnife then
+            targetSkinName = Config.ActiveGunSkins[weaponName]
+            if not targetSkinName then return end
+        end
+        if targetSkinName == "Vanilla" or targetSkinName == "Stock" or targetSkinName == "" then return end
+        
+        local wFolder = skinsFolder:FindFirstChild(targetWeaponName); if not wFolder then return end
+        local skinFolder = wFolder:FindFirstChild(targetSkinName); if not skinFolder then return end
+        local assetSource = skinFolder:FindFirstChild("Camera") or skinFolder
+        local finalSource = assetSource:FindFirstChild("Factory New") or assetSource:FindFirstChild("Minimal Wear") or assetSource:FindFirstChild("Field-Tested") or assetSource:FindFirstChild("Well-Worn") or assetSource:FindFirstChild("Battle-Scarred") or assetSource
+        local skinAssets = {}; local fallbackAsset = nil
+        for _, obj in pairs(finalSource:GetChildren()) do
+            if obj:IsA("SurfaceAppearance") or obj:IsA("Texture") or obj:IsA("Decal") then
+                local name = string.lower(obj.Name); skinAssets[name] = obj
+                if string.find(name, "body") or string.find(name, "receiver") or string.find(name, "main") then fallbackAsset = obj end
+            elseif obj:IsA("MeshPart") then
+                skinAssets[string.lower(obj.Name)] = obj
+            end
+        end
+        if not fallbackAsset then for _, obj in pairs(skinAssets) do fallbackAsset = obj; break; end end
+        
+        local function isArmOrGlove(n) n = string.lower(n); return string.find(n, "glove") or string.find(n, "sleeve") or string.find(n, "arm") or string.find(n, "wrist") or (string.find(n, "hand") and not string.find(n, "handle")) end
+        for _, descendant in pairs(weaponModel:GetDescendants()) do 
+            if descendant:IsA("BasePart") then
+                local descName = string.lower(descendant.Name); local parentName = descendant.Parent and string.lower(descendant.Parent.Name) or ""
+                if isGlove then if not isArmOrGlove(descName) and not isArmOrGlove(parentName) then continue end
+                else if isArmOrGlove(descName) or isArmOrGlove(parentName) then continue end end
+                local targetAsset = skinAssets[descName]
+                if not targetAsset then for _, child in pairs(descendant:GetChildren()) do if child:IsA("SurfaceAppearance") then local cName = string.lower(child.Name); if skinAssets[cName] then targetAsset = skinAssets[cName]; break end end end end
+                if not targetAsset and descendant:IsA("MeshPart") then targetAsset = fallbackAsset end
+                if targetAsset then 
+                    for _, old in pairs(descendant:GetChildren()) do if old:IsA("SurfaceAppearance") or old:IsA("Texture") or old:IsA("Decal") then old:Destroy() end end
+                    if descendant:IsA("MeshPart") then descendant.TextureID = "" end
+                    local specialMesh = descendant:FindFirstChildWhichIsA("SpecialMesh"); if specialMesh then specialMesh.TextureId = "" end
+                    if targetAsset:IsA("SurfaceAppearance") then if descendant:IsA("MeshPart") then targetAsset:Clone().Parent = descendant end else targetAsset:Clone().Parent = descendant end
+                end 
+            end
+        end
+    end)
+end
+Camera.ChildAdded:Connect(function(child) if Config.AutoApplySkins and (AvailableGunSkins[child.Name] or string.find(string.lower(child.Name), "knife") or string.find(string.lower(child.Name), "melee")) then task.wait(0.2); ApplyWeaponSkin(child) end end)
+
+local function PopulateSkins(weaponName, scrollUI, listUI, dictStore, targetVar)
+    for _, c in pairs(scrollUI:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+    local skins = dictStore[weaponName] or FoundSkins
+    if skins then
+        local StockBtn = Instance.new("TextButton", scrollUI); StockBtn.Text = "Stock/Vanilla"; StockBtn.Size = UDim2.new(1, -6, 0, 25); StockBtn.BackgroundColor3 = Theme.Background; StockBtn.TextColor3 = Theme.Text; StockBtn.Font = Enum.Font.GothamMedium; StockBtn.TextSize = 12; Instance.new("UICorner", StockBtn).CornerRadius = UDim.new(0,4)
+        StockBtn.MouseButton1Click:Connect(function() 
+            if targetVar == "Gun" then Config.ActiveGunSkins[weaponName] = "Stock" elseif targetVar == "Knife" then Config.TargetSkin = "Vanilla" else Config.TargetSkinGlove = "Vanilla" end
+            for _, b in pairs(scrollUI:GetChildren()) do if b:IsA("TextButton") then b.TextColor3 = Theme.Text; b.BackgroundColor3 = Theme.Background end end; StockBtn.TextColor3 = Theme.MainColor; StockBtn.BackgroundColor3 = Theme.Panel
+            pcall(function() for _, child in pairs(Camera:GetChildren()) do if child:IsA("Model") then ApplyWeaponSkin(child) end end end)
+        end)
+        for _, skinName in ipairs(skins) do 
+            if string.lower(skinName) ~= "stock" and string.lower(skinName) ~= "vanilla" then 
+                local SBtn = Instance.new("TextButton", scrollUI); SBtn.Text = skinName; SBtn.Size = UDim2.new(1, -6, 0, 25); SBtn.BackgroundColor3 = Theme.Background; SBtn.TextColor3 = Theme.Text; SBtn.Font = Enum.Font.GothamMedium; SBtn.TextSize = 12; Instance.new("UICorner", SBtn).CornerRadius = UDim.new(0,4)
+                SBtn.MouseButton1Click:Connect(function() 
+                    if targetVar == "Gun" then Config.ActiveGunSkins[weaponName] = skinName elseif targetVar == "Knife" then Config.TargetSkin = skinName else Config.TargetSkinGlove = skinName end
+                    for _, b in pairs(scrollUI:GetChildren()) do if b:IsA("TextButton") then b.TextColor3 = Theme.Text; b.BackgroundColor3 = Theme.Background end end; SBtn.TextColor3 = Theme.MainColor; SBtn.BackgroundColor3 = Theme.Panel
+                    pcall(function() for _, child in pairs(Camera:GetChildren()) do if child:IsA("Model") then ApplyWeaponSkin(child) end end end)
+                end) 
+            end
+        end
+        scrollUI.CanvasSize = UDim2.new(0, 0, 0, listUI.AbsoluteContentSize.Y + 10)
+    end
+end
+
+local sortedWeapons = {}; for w, _ in pairs(AvailableGunSkins) do table.insert(sortedWeapons, w) end; table.sort(sortedWeapons)
+for _, weaponName in ipairs(sortedWeapons) do 
+    local WBtn = Instance.new("TextButton", GunWepScroll); WBtn.Text = weaponName; WBtn.TextColor3 = Theme.Text; WBtn.Size = UDim2.new(1, -6, 0, 25); WBtn.BackgroundColor3 = Theme.Background; WBtn.Font = Enum.Font.GothamMedium; WBtn.TextSize = 11; Instance.new("UICorner", WBtn).CornerRadius = UDim.new(0,4)
+    WBtn.MouseButton1Click:Connect(function() PopulateSkins(weaponName, GunSkinScroll, GSL, AvailableGunSkins, "Gun"); for _, b in pairs(GunWepScroll:GetChildren()) do if b:IsA("TextButton") then b.TextColor3 = Theme.Text; b.BackgroundColor3 = Theme.Background end end; WBtn.TextColor3 = Theme.AccentColor; WBtn.BackgroundColor3 = Theme.Panel end) 
+end
+GunWepScroll.CanvasSize = UDim2.new(0, 0, 0, GL.AbsoluteContentSize.Y + 10)
+
+for _, knife in ipairs(FoundKnives) do 
+    local WBtn = Instance.new("TextButton", KniWepScroll); WBtn.Text = knife; WBtn.TextColor3 = Theme.Text; WBtn.Size = UDim2.new(1, -6, 0, 25); WBtn.BackgroundColor3 = Theme.Background; WBtn.Font = Enum.Font.GothamMedium; WBtn.TextSize = 11; Instance.new("UICorner", WBtn).CornerRadius = UDim.new(0,4)
+    WBtn.MouseButton1Click:Connect(function() Config.TargetKnife = knife; local tf = skinsFolder and skinsFolder:FindFirstChild(knife); if tf then local tSkins = {"Vanilla"}; for _, s in pairs(tf:GetChildren()) do table.insert(tSkins, s.Name) end; PopulateSkins(knife, KniSkinScroll, KSL, { [knife] = tSkins }, "Knife") end; for _, b in pairs(KniWepScroll:GetChildren()) do if b:IsA("TextButton") then b.TextColor3 = Theme.Text; b.BackgroundColor3 = Theme.Background end end; WBtn.TextColor3 = Theme.AccentColor; WBtn.BackgroundColor3 = Theme.Panel; pcall(function() for _, child in pairs(Camera:GetChildren()) do if child:IsA("Model") then ApplyWeaponSkin(child) end end end) end) 
+end
+KniWepScroll.CanvasSize = UDim2.new(0, 0, 0, KL.AbsoluteContentSize.Y + 10)
+
+for _, glv in ipairs(FoundGloves) do 
+    local WBtn = Instance.new("TextButton", GloWepScroll); WBtn.Text = glv; WBtn.TextColor3 = Theme.Text; WBtn.Size = UDim2.new(1, -6, 0, 25); WBtn.BackgroundColor3 = Theme.Background; WBtn.Font = Enum.Font.GothamMedium; WBtn.TextSize = 11; Instance.new("UICorner", WBtn).CornerRadius = UDim.new(0,4)
+    WBtn.MouseButton1Click:Connect(function() Config.TargetGlove = glv; local tf = skinsFolder and skinsFolder:FindFirstChild(glv); if tf then local tSkins = {"Vanilla"}; for _, s in pairs(tf:GetChildren()) do table.insert(tSkins, s.Name) end; PopulateSkins(glv, GloSkinScroll, GSSL, { [glv] = tSkins }, "Glove") end; for _, b in pairs(GloWepScroll:GetChildren()) do if b:IsA("TextButton") then b.TextColor3 = Theme.Text; b.BackgroundColor3 = Theme.Background end end; WBtn.TextColor3 = Theme.AccentColor; WBtn.BackgroundColor3 = Theme.Panel; pcall(function() for _, child in pairs(Camera:GetChildren()) do if child:IsA("Model") then ApplyWeaponSkin(child) end end end) end) 
+end
+GloWepScroll.CanvasSize = UDim2.new(0, 0, 0, GLL.AbsoluteContentSize.Y + 10)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp or UserInputService:GetFocusedTextBox() then return end
+    if input.KeyCode ~= Enum.KeyCode.Unknown then
+        if input.KeyCode == Config.MenuKey then ToggleMenu(not IsMenuOpen) end
+        if input.KeyCode == Enum.KeyCode.F5 then
+            SkinFrame.Visible = not SkinFrame.Visible
+            if SkinFrame.Visible then MainFrame.Visible = false end
+        end
+    end
+end)
+
+local function IsTeammate(model)
+    if model == LocalPlayer.Character or model.Name == LocalPlayer.Name then return true end
+    local player = Players:GetPlayerFromCharacter(model) or Players:FindFirstChild(model.Name)
+    if player and LocalPlayer.Team and player.Team == LocalPlayer.Team then return true end
+    local myChar = LocalPlayer.Character
+    if myChar and myChar.Parent and myChar.Parent:IsA("Folder") and model.Parent == myChar.Parent then return true end
+    return false
+end
+
+local _visParams = RaycastParams.new()
+_visParams.FilterType = Enum.RaycastFilterType.Exclude
+local function IsVisibleCheck(targetPart)
+    local origin = Camera.CFrame.Position; local direction = targetPart.Position - origin
+    local ignoreList = {Camera}
+    if LocalPlayer.Character then table.insert(ignoreList, LocalPlayer.Character) end
+    local _debris = Workspace:FindFirstChild("Debris"); if _debris then table.insert(ignoreList, _debris) end
+    if CharFolder then
+        local myTeam = LocalPlayer.Team and LocalPlayer.Team.Name or "None"
+        local tFolder = CharFolder:FindFirstChild(myTeam)
+        if tFolder then table.insert(ignoreList, tFolder) end
+    end
+    _visParams.FilterDescendantsInstances = ignoreList
+
+    local attempts = 0
+    while attempts < 3 do
+        attempts = attempts + 1
+        local result = Workspace:Raycast(origin, direction, _visParams)
+        if result then
+            if result.Instance:IsDescendantOf(targetPart.Parent) then return true
+            elseif result.Instance.Transparency >= 0.5 or not result.Instance.CanCollide or string.find(string.lower(result.Instance.Name), "hitbox") or result.Instance.Name == "Glass" then
+                table.insert(ignoreList, result.Instance)
+                _visParams.FilterDescendantsInstances = ignoreList
+            else return false end
+        else return true end
+    end
+    return false
+end
+
+local function getTarget(targetFOV)
+    local aimPoint = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2); local bestPart, bestDist = nil, targetFOV
+    for model, data in pairs(W.PlayerCache) do
+        if IsTeammate(model) then continue end
+        local part = data[Config.TargetPartMode] or data.Head
+        local hum = data.Humanoid
+        if hum and hum.Health > 0 and part then
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                local d = (Vector2.new(pos.X, pos.Y) - aimPoint).Magnitude
+                if d < bestDist then
+                    if Config.AimWallCheck and not IsVisibleCheck(part) then continue end
+                    bestDist = d; bestPart = part
+                end
+            end
+        end
+    end
+    return bestPart
+end
+
+task.spawn(function()
+    while task.wait(0.2) do
+        pcall(function()
+            if Config.HitboxExpander then
+                for model, data in pairs(W.PlayerCache) do
+                    if not IsTeammate(model) and data.Humanoid and data.Humanoid.Health > 0 then
+                        local part = data[Config.TargetPartMode] or data.Head
+                        if part then
+                            if not W.OriginalSizes[part] then W.OriginalSizes[part] = part.Size end
+                            local hs = math.clamp(Config.HitboxSize, 1, 3)
+                            part.Size = Vector3.new(hs, hs, hs)
+                            part.Transparency = Config.HitboxTransparency / 100
+                            part.CanCollide = false
+                        end
+                    end
+                end
+            end
+            for part, size in pairs(W.OriginalSizes) do
+                if part and part.Parent then
+                    if not Config.HitboxExpander or part.Name ~= Config.TargetPartMode or part.Parent.Name == LocalPlayer.Name or IsTeammate(part.Parent) or (part.Parent:FindFirstChild("Humanoid") and part.Parent.Humanoid.Health <= 0) then
+                        part.Size = size
+                        part.Transparency = 0
+                        W.OriginalSizes[part] = nil
+                    end
+                else W.OriginalSizes[part] = nil end
+            end
+        end)
+    end
+end)
+
+local function CreateGuiBox() local frame = Instance.new("Frame"); frame.BackgroundTransparency = 1; frame.Visible = false; frame.Parent = MasterGui; local stroke = Instance.new("UIStroke"); stroke.Thickness = 2.5; stroke.Color = Color3.new(1,1,1); stroke.Parent = frame; return {Frame = frame, Stroke = stroke} end
+local function CreateGuiLine() local line = Instance.new("Frame"); line.BorderSizePixel = 0; line.BackgroundColor3 = Color3.new(1,1,1); line.Visible = false; line.AnchorPoint = Vector2.new(0.5, 0.5); line.Parent = MasterGui; return line end
+local function CreateGuiText() local txt = Instance.new("TextLabel"); txt.BackgroundTransparency = 1; txt.Visible = false; txt.Font = Enum.Font.GothamMedium; txt.TextSize = 13; txt.TextColor3 = Color3.new(1,1,1); txt.TextStrokeTransparency = 0.2; txt.AnchorPoint = Vector2.new(0.5, 0.5); txt.Parent = MasterGui; return txt end
+local function UpdateGuiLine(lineObj, p1, p2, thickness, color)
+    local center = (p1 + p2) / 2; local dist = (p2 - p1).Magnitude; local angle = math.deg(math.atan2(p2.Y - p1.Y, p2.X - p1.X))
+    lineObj.Position = UDim2.fromOffset(center.X, center.Y); lineObj.Size = UDim2.fromOffset(dist, thickness); lineObj.Rotation = angle; lineObj.BackgroundColor3 = color; lineObj.Visible = true
+end
+local function GetBonePos(char, partName)
+    local part = char:FindFirstChild(partName) or char:FindFirstChild(partName:gsub("Upper", ""):gsub("Lower", ""))
+    if part then local pos, vis = Camera:WorldToViewportPoint(part.Position); if vis then return Vector2.new(pos.X, pos.Y) end end; return nil
+end
+
+local function RemoveESP(model)
+    if W.ESP_Objects[model] then
+        local d = W.ESP_Objects[model]; d.BoxFrame.Frame:Destroy(); d.Name:Destroy(); d.HPBg:Destroy(); d.HPFill:Destroy(); d.Tracer:Destroy(); for _, l in ipairs(d.BoxLines) do l:Destroy() end; for _, l in ipairs(d.SkeletonLines) do l:Destroy() end
+        W.ESP_Objects[model] = nil
+    end
+end
+
+local function UpdateESP()
+    if not Config.ESP then for m, o in pairs(W.ESP_Objects) do RemoveESP(m) end return end
+    local currentModels = {}
+    for model, data in pairs(W.PlayerCache) do
+        local hum, hrp, head = data.Humanoid, data.Root, data.Head
+        if hum and hum.Health > 0 then
+            local isFriendly = IsTeammate(model)
+            if isFriendly then continue end
+            
+            local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position); local headVector = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+            local drawColor = Color3.fromRGB(255, 50, 50)
+            currentModels[model] = true
+            if not W.ESP_Objects[model] then
+                W.ESP_Objects[model] = { BoxLines = {}, BoxFrame = CreateGuiBox(), Name = CreateGuiText(), HPBg = CreateGuiLine(), HPFill = CreateGuiLine(), Tracer = CreateGuiLine(), SkeletonLines = {} }
+                for i = 1, 12 do table.insert(W.ESP_Objects[model].BoxLines, CreateGuiLine()) end; for i = 1, 14 do table.insert(W.ESP_Objects[model].SkeletonLines, CreateGuiLine()) end
+            end
+            local d = W.ESP_Objects[model]
+
+            if onScreen then
+                local boxHeight = math.abs((vector.Y - headVector.Y) * 2.3); local boxWidth = boxHeight / 1.5; local boxPos = Vector2.new(vector.X - boxWidth / 2, vector.Y - boxHeight / 2)
+                if Config.Box then d.BoxFrame.Frame.Visible = true; d.BoxFrame.Frame.Position = UDim2.fromOffset(boxPos.X, boxPos.Y); d.BoxFrame.Frame.Size = UDim2.fromOffset(boxWidth, boxHeight); d.BoxFrame.Stroke.Color = drawColor else d.BoxFrame.Frame.Visible = false end
+                if Config.Name then d.Name.Visible = true; d.Name.Text = model.Name; d.Name.Position = UDim2.fromOffset(boxPos.X + (boxWidth / 2), boxPos.Y - 15); d.Name.TextColor3 = drawColor else d.Name.Visible = false end
+                if Config.HPBar then local hpPercent = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1); local barHeight = math.max(1, boxHeight * hpPercent); UpdateGuiLine(d.HPBg, Vector2.new(boxPos.X - 5, boxPos.Y - 1), Vector2.new(boxPos.X - 5, boxPos.Y + boxHeight + 1), 3, Color3.new(0, 0, 0)); UpdateGuiLine(d.HPFill, Vector2.new(boxPos.X - 5, boxPos.Y + boxHeight), Vector2.new(boxPos.X - 5, boxPos.Y + boxHeight - barHeight), 1.5, Color3.new(1 - hpPercent, hpPercent, 0)) else d.HPBg.Visible = false; d.HPFill.Visible = false end
+                if Config.Tracers then local startPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y); local endPos = Vector2.new(vector.X, vector.Y + (boxHeight / 2)); UpdateGuiLine(d.Tracer, startPos, endPos, 1.5, drawColor) else d.Tracer.Visible = false end
+                if Config.Skeleton then
+                    local joints = { {GetBonePos(model, "Head"), GetBonePos(model, "UpperTorso")}, {GetBonePos(model, "UpperTorso"), GetBonePos(model, "LowerTorso")}, {GetBonePos(model, "UpperTorso"), GetBonePos(model, "LeftUpperArm")}, {GetBonePos(model, "LeftUpperArm"), GetBonePos(model, "LeftLowerArm")}, {GetBonePos(model, "LeftLowerArm"), GetBonePos(model, "LeftHand")}, {GetBonePos(model, "UpperTorso"), GetBonePos(model, "RightUpperArm")}, {GetBonePos(model, "RightUpperArm"), GetBonePos(model, "RightLowerArm")}, {GetBonePos(model, "RightLowerArm"), GetBonePos(model, "RightHand")}, {GetBonePos(model, "LowerTorso"), GetBonePos(model, "LeftUpperLeg")}, {GetBonePos(model, "LeftUpperLeg"), GetBonePos(model, "LeftLowerLeg")}, {GetBonePos(model, "LeftLowerLeg"), GetBonePos(model, "LeftFoot")}, {GetBonePos(model, "LowerTorso"), GetBonePos(model, "RightUpperLeg")}, {GetBonePos(model, "RightUpperLeg"), GetBonePos(model, "RightLowerLeg")}, {GetBonePos(model, "RightLowerLeg"), GetBonePos(model, "RightFoot")} }
+                    for i, line in ipairs(d.SkeletonLines) do local joint = joints[i]; if joint and joint[1] and joint[2] then UpdateGuiLine(line, joint[1], joint[2], 1.5, drawColor) else line.Visible = false end end
+                else for _, line in ipairs(d.SkeletonLines) do line.Visible = false end end
+            else
+                d.BoxFrame.Frame.Visible = false; d.Name.Visible = false; d.HPBg.Visible = false; d.HPFill.Visible = false; d.Tracer.Visible = false; for _, l in ipairs(d.BoxLines) do l.Visible = false end; for _, l in ipairs(d.SkeletonLines) do l.Visible = false end
+            end
+            
+            if Config.SmartPartESP then
+                local p = model:FindFirstChild(Config.TargetPartMode) or model:FindFirstChild("Head")
+                if p then
+                    local bha = p:FindFirstChild(ChamName)
+                    if not bha then bha = Instance.new("BoxHandleAdornment"); bha.Name = ChamName; bha.Adornee = p; bha.AlwaysOnTop = true; bha.ZIndex = 5; bha.Transparency = 0.4; bha.Parent = p end
+                    bha.Size = p.Size + Vector3.new(0.05, 0.05, 0.05); bha.Color3 = drawColor; bha.Visible = true
+                end
+            else
+                for _, pName in ipairs({"Head", "UpperTorso", "LeftUpperArm", "RightUpperArm", "LeftUpperLeg", "RightUpperLeg"}) do local p = model:FindFirstChild(pName); if p then local bha = p:FindFirstChild(ChamName); if bha then bha.Visible = false end end end
+            end
+        end
+    end
+    for m, o in pairs(W.ESP_Objects) do if not currentModels[m] then RemoveESP(m) end end
+end
+
+local ShootRemote
+task.spawn(function()
+    local attempts = 0
+    while not ShootRemote and attempts < 50 do
+        pcall(function() 
+            local game_require = (getrenv and getrenv().require) or require
+            ShootRemote = game_require(ReplicatedStorage.Database.Security.Remotes).Inventory.ShootWeapon 
+        end)
+        attempts = attempts + 1; task.wait(0.1)
+    end
+    
+    if ShootRemote then
+        local oldSend = ShootRemote.Send
+        ShootRemote.Send = function(self, data, ...)
+            if data and data.Bullets then
+                local fovToCheck = Config.SilentEnabled and Config.FOV or 0
+                local tPart = getTarget(fovToCheck)
+                for _, b in pairs(data.Bullets) do
+                    if Config.SilentEnabled and tPart then
+                        local origin = Camera.CFrame.Position
+                        local direction = (tPart.Position - origin).Unit
+                        b.Direction = direction
+                        
+                        b.Hits = { { Instance = tPart, Position = tPart.Position, Normal = -b.Direction, Material = tPart.Material.Name, Distance = (tPart.Position - origin).Magnitude, Exit = false } }
+                        
+                        if Config.Hitmarker then HitmarkerCenter.Visible=true; task.delay(0.2, function() HitmarkerCenter.Visible=false end) end
+                        if Config.HitSound then task.spawn(function() local sid = Config.CustomHitSoundID or "131051026960528"; local s = Instance.new("Sound"); s.SoundId = "rbxassetid://" .. sid; s.Volume = 3; s.Parent = SoundService; s:Play(); task.delay(2, function() s:Destroy() end) end) end
+                    end
+                end
+            end
+            return oldSend(self, data, ...)
+        end
+    end
+end)
+
+local espTimer = 0
+RunService.RenderStepped:Connect(function(dt)
+    espTimer = espTimer + dt
+    if espTimer >= 0.016 then UpdateESP(); espTimer = 0 end
+    
+    local centerPoint = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local c = LocalPlayer.Character
+    
+    if SilentFOV then
+        SilentFOV.Position = UDim2.fromOffset(centerPoint.X, centerPoint.Y)
+        local r = tonumber(Config.FOV) or 150; SilentFOV.Size = UDim2.fromOffset(r*2, r*2)
+        if Config.ShowFOV then SilentFOV.Visible = true else SilentFOV.Visible = false end
+    end
+    
+    local hue = tick() % 5 / 5
+    local pureRgbColor = Color3.fromHSV(hue, 1, 1)
+    
+    if Config.SpinCrosshair then
+        CrossFrame.Visible = true
+        CrossFrame.Rotation = (CrossFrame.Rotation + (Config.CrosshairSpeed or 10)) % 360
+        l1.BackgroundColor3 = pureRgbColor; l2.BackgroundColor3 = pureRgbColor
+    else
+        CrossFrame.Visible = false
+    end
+    
+    if c and c:FindFirstChild("Humanoid") then
+        local hum = c.Humanoid
+        if Config.AutoBhop and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            hum.Jump = true
+        end
+    end
+    
+    local isShooting = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+    if Config.RCS and isShooting then
+        local rcsPower = (tonumber(Config.RCS_Strength) or 5) / 20
+        if mousemoverel then pcall(function() mousemoverel(0, rcsPower) end) end
+    end
+    
+    local isAiming = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+    if Config.Aimlock and isAiming then
+        local targetPart = getTarget(Config.AimFOV)
+        if targetPart then 
+            local targetPos = targetPart.Position
+            local targetRoot = targetPart.Parent:FindFirstChild("HumanoidRootPart")
+            if targetRoot and Config.AimPrediction then
+                local distToTarget = (targetPos - Camera.CFrame.Position).Magnitude
+                targetPos = targetPos + (targetRoot.AssemblyLinearVelocity * (distToTarget / 1500))
+            end
+
+            local pos, onScreen = Camera:WorldToViewportPoint(targetPos)
+            if onScreen then 
+                local aimJitterVal = tonumber(Config.AimJitter) or 10; local jitterAmount = aimJitterVal / 100
+                local jX = (math.random() - 0.5) * jitterAmount * 2; local jY = (math.random() - 0.5) * jitterAmount * 2
+
+                local xDiff = (pos.X - centerPoint.X) + jX; local yDiff = (pos.Y - centerPoint.Y) + jY
+                local moveX = math.floor(xDiff / Config.AimSmoothness); local moveY = math.floor(yDiff / Config.AimSmoothness)
+                
+                if Config.AimMethod == "Raw Mouse" then
+                    if math.abs(moveX) < 1000 and math.abs(moveY) < 1000 then if mousemoverel then pcall(function() mousemoverel(moveX, moveY) end) end end
+                else
+                    if math.abs(moveX) < 1000 and math.abs(moveY) < 1000 then if mousemoverel then pcall(function() mousemoverel(moveX, moveY) end) end end
+                end
+            end
+        end
+    end
+end)
+
+local MasterIcons = {}
+task.spawn(function()
+    pcall(function()
+        for _,v in pairs(getgc(true)) do
+            if type(v)=="table" and rawget(v,"Karambit") then
+                for n,d in pairs(v) do
+                    if type(d)=="table" and rawget(d,"Image") then
+                        MasterIcons[n]={Img=d.Image, Off=d.ImageRectOffset, Sz=d.ImageRectSize}
+                    end
+                end
+            end
+        end
+    end)
+    
+    while task.wait(0.5) do
+        pcall(function()
+            local c = LocalPlayer.Character; if not c or not c:FindFirstChild("Humanoid") or c.Humanoid.Health<=0 then return end
+            local aK = Config.TargetKnife; local kD = MasterIcons[aK]
+            if kD then
+                local pg = LocalPlayer:FindFirstChild("PlayerGui")
+                if pg then 
+                    for _,g in pairs(pg:GetDescendants()) do 
+                        if g:IsA("TextLabel") and g.Visible and (g.Text=="CT Knife" or g.Text=="T Knife" or g.Text=="Melee" or g.Text==aK) then
+                            g.Text = aK; local cont = g.Parent and g.Parent.Parent
+                            if cont then 
+                                for _,s in pairs(cont:GetDescendants()) do 
+                                    if s:IsA("ImageLabel") then s.Image=kD.Img; s.ImageRectOffset=kD.Off; s.ImageRectSize=kD.Sz end 
+                                end 
+                            end
+                        end 
+                    end 
+                end
+            end
+        end)
+    end
+end)
+
+task.spawn(function()
+    task.wait(1.5)
+    ToggleMenu(true)
+end)
